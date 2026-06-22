@@ -28,6 +28,22 @@ function dayPct(rec: RtnDay | undefined): number {
   return Math.round((done / ALL_CHECK_KEYS.length) * 100);
 }
 
+// 체크 key → 라벨 (모아보기에서 사용)
+const CHECK_LABELS: Record<string, string> = {};
+STEPS.forEach((s) => {
+  if (s.kind === "checks")
+    s.items.forEach((it) => {
+      if (it.kind === "check") CHECK_LABELS[it.key] = it.label;
+    });
+});
+const MOOD_MAP = Object.fromEntries(MOODS.map((m) => [m.key, m]));
+const BODY_MAP = Object.fromEntries(BODYS.map((b) => [b.key, b]));
+
+function fmtMD(date: string): string {
+  const d = new Date(date + "T00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 /* ───────────────────────── 항목 렌더러 (체크 · 시각) ───────────────────────── */
 
 function ItemRow({ it, date }: { it: RtnItem; date: string }) {
@@ -338,7 +354,13 @@ function DayOverview({
 
 /* ───────────────────────── 캘린더 대시보드 ───────────────────────── */
 
-function Calendar({ onPick }: { onPick: (date: string) => void }) {
+function Calendar({
+  onPick,
+  onArchive,
+}: {
+  onPick: (date: string) => void;
+  onArchive: () => void;
+}) {
   const { days } = useRtn();
   const today = new Date(ymd(new Date()) + "T00:00");
   const todayStr = ymd(today);
@@ -439,6 +461,264 @@ function Calendar({ onPick }: { onPick: (date: string) => void }) {
           );
         })}
       </div>
+
+      <WeightChart days={days} />
+
+      <button className="rtn-archive-btn" onClick={onArchive}>
+        📖 기록 모아보기
+      </button>
+    </div>
+  );
+}
+
+/* ───────────────────────── 몸무게 선그래프 ───────────────────────── */
+
+function WeightChart({ days }: { days: Record<string, RtnDay> }) {
+  const points = useMemo(
+    () =>
+      Object.values(days)
+        .filter((d) => Number(d.nums?.weight) > 0)
+        .map((d) => ({ date: d.date, w: Number(d.nums.weight) }))
+        .sort((a, b) => (a.date < b.date ? -1 : 1))
+        .slice(-30),
+    [days]
+  );
+
+  return (
+    <section className="rtn-card rtn-section">
+      <h2 className="rtn-section-title">
+        <span>⚖️</span>몸무게 변화
+      </h2>
+      {points.length < 2 ? (
+        <p className="rtn-chart-empty">몸무게를 2일 이상 기록하면 변화 그래프가 보여요.</p>
+      ) : (
+        (() => {
+          const W = 320,
+            H = 150,
+            padX = 30,
+            padT = 24,
+            padB = 22;
+          const ws = points.map((p) => p.w);
+          const min = Math.min(...ws);
+          const max = Math.max(...ws);
+          const span = max - min || 1;
+          const X = (i: number) =>
+            padX + (i / (points.length - 1)) * (W - padX * 2);
+          const Y = (w: number) =>
+            padT + (1 - (w - min) / span) * (H - padT - padB);
+          const line = points.map((p, i) => `${X(i)},${Y(p.w)}`).join(" ");
+          const area = `${X(0)},${H - padB} ${line} ${X(points.length - 1)},${H - padB}`;
+          const last = points[points.length - 1];
+          const first = points[0];
+          const delta = Math.round((last.w - first.w) * 10) / 10;
+
+          return (
+            <>
+              <div className="rtn-weight-head">
+                <b>{last.w}kg</b>
+                <span className={delta === 0 ? "" : delta < 0 ? "down" : "up"}>
+                  {delta === 0
+                    ? "변화 없음"
+                    : `${delta > 0 ? "▲ +" : "▼ "}${Math.abs(delta)}kg (기록 시작 대비)`}
+                </span>
+              </div>
+              <svg
+                className="rtn-weight-svg"
+                viewBox={`0 0 ${W} ${H}`}
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="몸무게 변화 그래프"
+              >
+                <defs>
+                  <linearGradient id="wfill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.18" />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <text x={padX - 6} y={Y(max) + 4} className="rtn-waxis" textAnchor="end">
+                  {max}
+                </text>
+                <text x={padX - 6} y={Y(min) + 4} className="rtn-waxis" textAnchor="end">
+                  {min}
+                </text>
+                <polygon points={area} fill="url(#wfill)" />
+                <polyline
+                  points={line}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                {points.map((p, i) => (
+                  <circle
+                    key={p.date}
+                    cx={X(i)}
+                    cy={Y(p.w)}
+                    r={i === points.length - 1 ? 4 : 2.5}
+                    fill={i === points.length - 1 ? "var(--accent)" : "var(--surface)"}
+                    stroke="var(--accent)"
+                    strokeWidth="2"
+                  />
+                ))}
+                <text x={X(0)} y={H - 6} className="rtn-wxlabel" textAnchor="start">
+                  {fmtMD(first.date)}
+                </text>
+                <text
+                  x={X(points.length - 1)}
+                  y={H - 6}
+                  className="rtn-wxlabel"
+                  textAnchor="end"
+                >
+                  {fmtMD(last.date)}
+                </text>
+              </svg>
+            </>
+          );
+        })()
+      )}
+    </section>
+  );
+}
+
+/* ───────────────────────── 모아보기 (기록 아카이브) ───────────────────────── */
+
+function Archive({
+  onBack,
+  onPick,
+}: {
+  onBack: () => void;
+  onPick: (date: string) => void;
+}) {
+  const { days } = useRtn();
+  const [tab, setTab] = useState<"diary" | "done">("diary");
+
+  const sorted = useMemo(
+    () => Object.values(days).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [days]
+  );
+
+  const diaryDays = sorted.filter((d) => d.morning_note || d.night_note);
+  const doneDays = sorted.filter(
+    (d) =>
+      Object.values(d.checks).some(Boolean) ||
+      d.todos.length > 0 ||
+      Object.values(d.texts).some((v) => v) ||
+      Number(d.nums?.weight) > 0
+  );
+
+  return (
+    <div className="rtn-archive">
+      <div className="rtn-flow-bar">
+        <button className="rtn-iconbtn" onClick={onBack} aria-label="달력으로">
+          ‹
+        </button>
+        <b>모아보기</b>
+        <span style={{ width: 40 }} />
+      </div>
+
+      <div className="rtn-arc-tabs">
+        <button
+          className={tab === "diary" ? "on" : ""}
+          onClick={() => setTab("diary")}
+        >
+          📖 일기 모아보기
+        </button>
+        <button
+          className={tab === "done" ? "on" : ""}
+          onClick={() => setTab("done")}
+        >
+          ✅ 한 일 모아보기
+        </button>
+      </div>
+
+      {tab === "diary" ? (
+        diaryDays.length === 0 ? (
+          <p className="rtn-arc-empty">아직 작성한 일기가 없어요.</p>
+        ) : (
+          diaryDays.map((d) => {
+            const mood = MOOD_MAP[d.mood];
+            return (
+              <section
+                key={d.date}
+                className="rtn-card rtn-arc-item"
+                onClick={() => onPick(d.date)}
+              >
+                <div className="rtn-arc-date">
+                  {fmtKDate(d.date)}
+                  {mood && <span className="rtn-arc-emoji">{mood.emoji}</span>}
+                </div>
+                {d.morning_note && (
+                  <p className="rtn-arc-note">
+                    <b>아침</b> {d.morning_note}
+                  </p>
+                )}
+                {d.night_note && (
+                  <p className="rtn-arc-note">
+                    <b>밤</b> {d.night_note}
+                  </p>
+                )}
+              </section>
+            );
+          })
+        )
+      ) : doneDays.length === 0 ? (
+        <p className="rtn-arc-empty">아직 기록한 활동이 없어요.</p>
+      ) : (
+        doneDays.map((d) => {
+          const mood = MOOD_MAP[d.mood];
+          const body = BODY_MAP[d.body];
+          const doneChecks = [
+            ...new Set(
+              Object.keys(d.checks)
+                .filter((k) => d.checks[k] && CHECK_LABELS[k])
+                .map((k) => CHECK_LABELS[k])
+            ),
+          ];
+          const weight = Number(d.nums?.weight) > 0 ? d.nums.weight : null;
+          const brunch = d.texts["brunch_menu"];
+          const dinner = d.texts["dinner_menu"];
+          return (
+            <section
+              key={d.date}
+              className="rtn-card rtn-arc-item"
+              onClick={() => onPick(d.date)}
+            >
+              <div className="rtn-arc-date">
+                {fmtKDate(d.date)}
+                <span className="rtn-arc-emoji">
+                  {mood && mood.emoji}
+                  {body && body.emoji}
+                </span>
+                {weight && <em className="rtn-arc-weight">{weight}kg</em>}
+              </div>
+              {doneChecks.length > 0 && (
+                <div className="rtn-arc-tags">
+                  {doneChecks.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </div>
+              )}
+              {(brunch || dinner) && (
+                <p className="rtn-arc-menu">
+                  🍚 {[brunch && `아점 ${brunch}`, dinner && `저녁 ${dinner}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+              {d.todos.length > 0 && (
+                <ul className="rtn-arc-todos">
+                  {d.todos.map((t) => (
+                    <li key={t.id} className={t.done ? "done" : ""}>
+                      {t.done ? "✓" : "○"} {t.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })
+      )}
     </div>
   );
 }
@@ -449,6 +729,12 @@ function AppInner() {
   const { loading, error, toastMsg } = useRtn();
   const [date, setDate] = useState<string | null>(null);
   const [mode, setMode] = useState<"flow" | "overview">("flow");
+  const [home, setHome] = useState<"calendar" | "archive">("calendar");
+
+  const openDay = (d: string) => {
+    setMode("flow");
+    setDate(d);
+  };
 
   return (
     <div className="rtn-wrap">
@@ -474,25 +760,24 @@ function AppInner() {
           </div>
         )}
 
-        {date === null ? (
-          <Calendar
-            onPick={(d) => {
-              setMode("flow");
-              setDate(d);
-            }}
-          />
-        ) : mode === "flow" ? (
-          <DayFlow
-            date={date}
-            onBack={() => setDate(null)}
-            onOverview={() => setMode("overview")}
-          />
+        {date !== null ? (
+          mode === "flow" ? (
+            <DayFlow
+              date={date}
+              onBack={() => setDate(null)}
+              onOverview={() => setMode("overview")}
+            />
+          ) : (
+            <DayOverview
+              date={date}
+              onBack={() => setDate(null)}
+              onFlow={() => setMode("flow")}
+            />
+          )
+        ) : home === "archive" ? (
+          <Archive onBack={() => setHome("calendar")} onPick={openDay} />
         ) : (
-          <DayOverview
-            date={date}
-            onBack={() => setDate(null)}
-            onFlow={() => setMode("flow")}
-          />
+          <Calendar onPick={openDay} onArchive={() => setHome("archive")} />
         )}
       </main>
 
