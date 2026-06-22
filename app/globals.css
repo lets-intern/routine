@@ -626,3 +626,71 @@ textarea {
 .rtn-arc-todos { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .rtn-arc-todos li { font-size: 13.5px; color: var(--ink-2); }
 .rtn-arc-todos li.done { color: var(--s-green-fg); }
+
+/* ───── 헤더 긴 제목 대응 ───── */
+.rtn-brand { min-width: 0; }
+.rtn-brand > b {
+  font-size: 13.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rtn-sync { flex: none; }
+
+/* ───── 오늘의 질문 ───── */
+.rtn-qcard {
+  background: linear-gradient(135deg, #fff 0%, var(--accent-soft) 130%);
+  margin-bottom: 14px;
+}
+.rtn-q-label { font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+.rtn-q-text {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0 0 14px;
+  color: var(--ink);
+  word-break: keep-all;
+}
+.rtn-q-shuffle {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+/* ───── 대시보드 네비 버튼 (모아보기 · 사진보기) ───── */
+.rtn-nav-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.rtn-nav-row button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.rtn-nav-row button:hover { border-color: var(--accent); }
+
+/* ───── 다예 사진보기 갤러리 ───── */
+.rtn-photos-cap {
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin: 4px 0 16px;
+}
+.rtn-photo-grid { display: flex; flex-direction: column; gap: 12px; }
+.rtn-photo-grid img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  background: var(--surface-2);
+}

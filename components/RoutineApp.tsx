@@ -6,7 +6,8 @@ import {
   ALL_CHECK_KEYS,
   BODYS,
   MOODS,
-  RTN_PERSON,
+  PHOTOS,
+  QUESTIONS,
   STEPS,
   type Choice,
   type RtnItem,
@@ -354,12 +355,65 @@ function DayOverview({
 
 /* ───────────────────────── 캘린더 대시보드 ───────────────────────── */
 
+/* ───────────────────────── 오늘의 질문 ───────────────────────── */
+
+function QuestionCard() {
+  const today = ymd(new Date());
+  const dayNum = Math.floor(new Date(today + "T00:00").getTime() / 86400000);
+  const [extra, setExtra] = useState(0);
+  const idx = ((dayNum + extra) % QUESTIONS.length + QUESTIONS.length) % QUESTIONS.length;
+  return (
+    <section className="rtn-card rtn-qcard">
+      <div className="rtn-q-label">💭 오늘 엄마가 생각해볼 질문</div>
+      <p className="rtn-q-text">{QUESTIONS[idx]}</p>
+      <button className="rtn-q-shuffle" onClick={() => setExtra((e) => e + 1)}>
+        다른 질문 보기 ↻
+      </button>
+    </section>
+  );
+}
+
+/* ───────────────────────── 다예 사진보기 ───────────────────────── */
+
+function Photos({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="rtn-photos">
+      <div className="rtn-flow-bar">
+        <button className="rtn-iconbtn" onClick={onBack} aria-label="달력으로">
+          ‹
+        </button>
+        <b>다예 사진보기</b>
+        <span style={{ width: 40 }} />
+      </div>
+      <p className="rtn-photos-cap">엄마 아빠, 사랑해요 💕</p>
+      <div className="rtn-photo-grid">
+        {PHOTOS.map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={src}
+            src={src}
+            alt={`사진 ${i + 1}`}
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── 캘린더 대시보드 ───────────────────────── */
+
 function Calendar({
   onPick,
   onArchive,
+  onPhotos,
 }: {
   onPick: (date: string) => void;
   onArchive: () => void;
+  onPhotos: () => void;
 }) {
   const { days } = useRtn();
   const today = new Date(ymd(new Date()) + "T00:00");
@@ -396,6 +450,8 @@ function Calendar({
 
   return (
     <div className="rtn-cal">
+      <QuestionCard />
+
       <div className="rtn-cal-stats">
         <div className="rtn-stat">
           <b>{streak}</b>
@@ -408,6 +464,11 @@ function Calendar({
         <button className="rtn-today-btn" onClick={() => onPick(todayStr)}>
           오늘 기록하기 →
         </button>
+      </div>
+
+      <div className="rtn-nav-row">
+        <button onClick={onArchive}>📖 기록 모아보기</button>
+        <button onClick={onPhotos}>📷 다예 사진보기</button>
       </div>
 
       <div className="rtn-cal-head">
@@ -463,10 +524,6 @@ function Calendar({
       </div>
 
       <WeightChart days={days} />
-
-      <button className="rtn-archive-btn" onClick={onArchive}>
-        📖 기록 모아보기
-      </button>
     </div>
   );
 }
@@ -729,7 +786,7 @@ function AppInner() {
   const { loading, error, toastMsg } = useRtn();
   const [date, setDate] = useState<string | null>(null);
   const [mode, setMode] = useState<"flow" | "overview">("flow");
-  const [home, setHome] = useState<"calendar" | "archive">("calendar");
+  const [home, setHome] = useState<"calendar" | "archive" | "photos">("calendar");
 
   const openDay = (d: string) => {
     setMode("flow");
@@ -741,7 +798,7 @@ function AppInner() {
       <header className="rtn-top">
         <div className="rtn-brand">
           <span className="rtn-mark">🌿</span>
-          <b>{RTN_PERSON} 루틴</b>
+          <b>다예가 만들어준 김은아 루틴 대시보드</b>
         </div>
         <div className={`rtn-sync${loading ? "" : " live"}`}>
           <span className="rtn-dot" />
@@ -776,8 +833,14 @@ function AppInner() {
           )
         ) : home === "archive" ? (
           <Archive onBack={() => setHome("calendar")} onPick={openDay} />
+        ) : home === "photos" ? (
+          <Photos onBack={() => setHome("calendar")} />
         ) : (
-          <Calendar onPick={openDay} onArchive={() => setHome("archive")} />
+          <Calendar
+            onPick={openDay}
+            onArchive={() => setHome("archive")}
+            onPhotos={() => setHome("photos")}
+          />
         )}
       </main>
 
