@@ -2,6 +2,9 @@
 
 export type Todo = { id: string; text: string; done: boolean };
 
+// 오늘의 질문에 대한 답변
+export type QA = { id: string; q: string; a: string };
+
 export type RtnDay = {
   date: string; // YYYY-MM-DD (PK)
   checks: Record<string, boolean>;
@@ -9,6 +12,7 @@ export type RtnDay = {
   nums: Record<string, number>;
   texts: Record<string, string>; // 메뉴 등 자유 입력 (brunch_menu, dinner_menu)
   todos: Todo[]; // 오늘의 투두
+  qa: QA[]; // 오늘의 질문 답변
   mood: string; // 기분 선택 (MOODS 의 key)
   body: string; // 몸 컨디션 (BODYS 의 key)
   morning_note: string; // 아침 글쓰기
@@ -25,6 +29,7 @@ export function emptyDay(date: string): RtnDay {
     nums: {},
     texts: {},
     todos: [],
+    qa: [],
     mood: "",
     body: "",
     morning_note: "",

@@ -30,6 +30,8 @@ type Store = {
   toggleTodo: (date: string, id: string) => void;
   editTodo: (date: string, id: string, text: string) => void;
   removeTodo: (date: string, id: string) => void;
+  addAnswer: (date: string, q: string, a: string) => void;
+  removeAnswer: (date: string, id: string) => void;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -80,6 +82,7 @@ export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
           nums: r.nums || {},
           texts: r.texts || {},
           todos: Array.isArray(r.todos) ? r.todos : [],
+          qa: Array.isArray(r.qa) ? r.qa : [],
           mood: r.mood || "",
           body: r.body || "",
           morning_note: r.morning_note || "",
@@ -203,6 +206,21 @@ export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
       mutate(date, (d) => ({ ...d, todos: d.todos.filter((t) => t.id !== id) }), false),
     [mutate]
   );
+  // 오늘의 질문 답변: 추가/삭제는 즉시 저장
+  const addAnswer = useCallback(
+    (date: string, q: string, a: string) =>
+      mutate(
+        date,
+        (d) => ({ ...d, qa: [...d.qa, { id: uid(), q, a }] }),
+        false
+      ),
+    [mutate]
+  );
+  const removeAnswer = useCallback(
+    (date: string, id: string) =>
+      mutate(date, (d) => ({ ...d, qa: d.qa.filter((x) => x.id !== id) }), false),
+    [mutate]
+  );
   // 기분/몸 컨디션: 같은 값 다시 누르면 선택 해제. 클릭이라 즉시 저장.
   const setChoice = useCallback(
     (date: string, field: "mood" | "body", value: string) =>
@@ -235,6 +253,8 @@ export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
     toggleTodo,
     editTodo,
     removeTodo,
+    addAnswer,
+    removeAnswer,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

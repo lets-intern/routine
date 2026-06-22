@@ -10,6 +10,7 @@ create table if not exists public.rtn_days (
   nums   jsonb not null default '{}'::jsonb,    -- 숫자 입력 { "bike_min": 30 }
   texts  jsonb not null default '{}'::jsonb,    -- 메뉴 등 자유 입력 { "brunch_menu": "샐러드" }
   todos  jsonb not null default '[]'::jsonb,    -- 오늘의 투두 [{ "id", "text", "done" }]
+  qa     jsonb not null default '[]'::jsonb,    -- 오늘의 질문 답변 [{ "id", "q", "a" }]
   mood   text not null default '',              -- 기분 선택 (great/good/ok/down/bad)
   body   text not null default '',              -- 몸 컨디션 (light/normal/heavy/sick)
   morning_note text not null default '',        -- 아침 글쓰기
@@ -23,6 +24,7 @@ alter table public.rtn_days add column if not exists morning_note text not null 
 alter table public.rtn_days add column if not exists night_note   text not null default '';
 alter table public.rtn_days add column if not exists texts        jsonb not null default '{}'::jsonb;
 alter table public.rtn_days add column if not exists todos        jsonb not null default '[]'::jsonb;
+alter table public.rtn_days add column if not exists qa           jsonb not null default '[]'::jsonb;
 
 -- RLS: 익명(anon) 키로 전체 접근 허용 (한 사람용 개인 도구).
 alter table public.rtn_days enable row level security;

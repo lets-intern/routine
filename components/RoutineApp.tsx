@@ -357,17 +357,66 @@ function DayOverview({
 /* ───────────────────────── 오늘의 질문 ───────────────────────── */
 
 function QuestionCard() {
+  const { getDay, addAnswer } = useRtn();
   const today = ymd(new Date());
   const dayNum = Math.floor(new Date(today + "T00:00").getTime() / 86400000);
   const [extra, setExtra] = useState(0);
-  const idx = ((dayNum + extra) % QUESTIONS.length + QUESTIONS.length) % QUESTIONS.length;
+  const [writing, setWriting] = useState(false);
+  const [draft, setDraft] = useState("");
+  const idx = (((dayNum + extra) % QUESTIONS.length) + QUESTIONS.length) % QUESTIONS.length;
+  const question = QUESTIONS[idx];
+  const answeredToday = getDay(today).qa.some((x) => x.q === question);
+
+  const save = () => {
+    const a = draft.trim();
+    if (!a) return;
+    addAnswer(today, question, a);
+    setDraft("");
+    setWriting(false);
+  };
+
+  const next = () => {
+    setExtra((e) => e + 1);
+    setWriting(false);
+    setDraft("");
+  };
+
   return (
     <section className="rtn-card rtn-qcard">
-      <div className="rtn-q-label">💭 오늘 엄마가 생각해볼 질문</div>
-      <p className="rtn-q-text">{QUESTIONS[idx]}</p>
-      <button className="rtn-q-shuffle" onClick={() => setExtra((e) => e + 1)}>
-        다른 질문 보기 ↻
-      </button>
+      <div className="rtn-q-label">💭 오늘 은아가 생각해볼 질문</div>
+      <p className="rtn-q-text">{question}</p>
+
+      {writing ? (
+        <div className="rtn-q-answer">
+          <textarea
+            autoFocus
+            placeholder="여기에 답을 적어보세요…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="rtn-q-answer-btns">
+            <button className="rtn-q-cancel" onClick={() => setWriting(false)}>
+              취소
+            </button>
+            <button className="rtn-q-save" onClick={save}>
+              저장
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="rtn-q-btns">
+          <button className="rtn-q-shuffle" onClick={next}>
+            다른 질문 보기 ↻
+          </button>
+          <button className="rtn-q-reply" onClick={() => setWriting(true)}>
+            {answeredToday ? "또 대답하기 ✎" : "대답하기 ✎"}
+          </button>
+        </div>
+      )}
+
+      {answeredToday && !writing && (
+        <p className="rtn-q-done">오늘 이 질문에 답했어요 ✓ (모아보기에서 볼 수 있어요)</p>
+      )}
     </section>
   );
 }
@@ -384,7 +433,6 @@ function Photos({ onBack, photos }: { onBack: () => void; photos: string[] }) {
         <b>다예 사진보기</b>
         <span style={{ width: 40 }} />
       </div>
-      <p className="rtn-photos-cap">엄마 아빠, 사랑해요 💕</p>
       {photos.length === 0 && (
         <p className="rtn-arc-empty">아직 사진이 없어요.</p>
       )}
@@ -649,8 +697,8 @@ function Archive({
   onBack: () => void;
   onPick: (date: string) => void;
 }) {
-  const { days } = useRtn();
-  const [tab, setTab] = useState<"diary" | "done">("diary");
+  const { days, removeAnswer } = useRtn();
+  const [tab, setTab] = useState<"diary" | "done" | "qa">("diary");
 
   const sorted = useMemo(
     () => Object.values(days).sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -658,6 +706,10 @@ function Archive({
   );
 
   const diaryDays = sorted.filter((d) => d.morning_note || d.night_note);
+  // 질문 답변: 날짜별 qa 를 펼쳐 최신순으로
+  const qaItems = sorted.flatMap((d) =>
+    d.qa.map((x) => ({ ...x, date: d.date }))
+  );
   const doneDays = sorted.filter(
     (d) =>
       Object.values(d.checks).some(Boolean) ||
@@ -689,10 +741,16 @@ function Archive({
         >
           ✅ 한 일 모아보기
         </button>
+        <button
+          className={tab === "qa" ? "on" : ""}
+          onClick={() => setTab("qa")}
+        >
+          💭 질문 답변
+        </button>
       </div>
 
-      {tab === "diary" ? (
-        diaryDays.length === 0 ? (
+      {tab === "diary" &&
+        (diaryDays.length === 0 ? (
           <p className="rtn-arc-empty">아직 작성한 일기가 없어요.</p>
         ) : (
           diaryDays.map((d) => {
@@ -720,11 +778,38 @@ function Archive({
               </section>
             );
           })
-        )
-      ) : doneDays.length === 0 ? (
-        <p className="rtn-arc-empty">아직 기록한 활동이 없어요.</p>
-      ) : (
-        doneDays.map((d) => {
+        ))}
+
+      {tab === "qa" &&
+        (qaItems.length === 0 ? (
+          <p className="rtn-arc-empty">
+            아직 답한 질문이 없어요. 대시보드의 &lsquo;오늘의 질문&rsquo;에서 대답해 보세요.
+          </p>
+        ) : (
+          qaItems.map((x) => (
+            <section key={x.id} className="rtn-card rtn-arc-item rtn-qa-item">
+              <div className="rtn-qa-q">
+                <span>Q.</span> {x.q}
+              </div>
+              <p className="rtn-qa-a">{x.a}</p>
+              <div className="rtn-qa-foot">
+                <span className="rtn-qa-date">{fmtKDate(x.date)}</span>
+                <button
+                  className="rtn-qa-del"
+                  onClick={() => removeAnswer(x.date, x.id)}
+                >
+                  삭제
+                </button>
+              </div>
+            </section>
+          ))
+        ))}
+
+      {tab === "done" &&
+        (doneDays.length === 0 ? (
+          <p className="rtn-arc-empty">아직 기록한 활동이 없어요.</p>
+        ) : (
+          doneDays.map((d) => {
           const mood = MOOD_MAP[d.mood];
           const body = BODY_MAP[d.body];
           const doneChecks = [
@@ -777,7 +862,7 @@ function Archive({
             </section>
           );
         })
-      )}
+        ))}
     </div>
   );
 }
