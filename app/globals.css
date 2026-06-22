@@ -685,14 +685,19 @@ textarea {
   color: var(--ink-2);
   margin: 4px 0 16px;
 }
-.rtn-photo-grid { display: flex; flex-direction: column; gap: 12px; }
+.rtn-photo-grid {
+  column-count: 2;
+  column-gap: 10px;
+}
 .rtn-photo-grid img {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 16px;
+  margin: 0 0 10px;
+  border-radius: 14px;
   box-shadow: var(--shadow);
   background: var(--surface-2);
+  break-inside: avoid;
 }
 
 /* ───── 오늘의 질문 — 대답하기 ───── */
