@@ -6,7 +6,6 @@ import {
   ALL_CHECK_KEYS,
   BODYS,
   MOODS,
-  PHOTOS,
   QUESTIONS,
   STEPS,
   type Choice,
@@ -375,7 +374,7 @@ function QuestionCard() {
 
 /* ───────────────────────── 다예 사진보기 ───────────────────────── */
 
-function Photos({ onBack }: { onBack: () => void }) {
+function Photos({ onBack, photos }: { onBack: () => void; photos: string[] }) {
   return (
     <div className="rtn-photos">
       <div className="rtn-flow-bar">
@@ -386,8 +385,11 @@ function Photos({ onBack }: { onBack: () => void }) {
         <span style={{ width: 40 }} />
       </div>
       <p className="rtn-photos-cap">엄마 아빠, 사랑해요 💕</p>
+      {photos.length === 0 && (
+        <p className="rtn-arc-empty">아직 사진이 없어요.</p>
+      )}
       <div className="rtn-photo-grid">
-        {PHOTOS.map((src, i) => (
+        {photos.map((src, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={src}
@@ -782,7 +784,7 @@ function Archive({
 
 /* ───────────────────────── 앱 셸 ───────────────────────── */
 
-function AppInner() {
+function AppInner({ photos }: { photos: string[] }) {
   const { loading, error, toastMsg } = useRtn();
   const [date, setDate] = useState<string | null>(null);
   const [mode, setMode] = useState<"flow" | "overview">("flow");
@@ -834,7 +836,7 @@ function AppInner() {
         ) : home === "archive" ? (
           <Archive onBack={() => setHome("calendar")} onPick={openDay} />
         ) : home === "photos" ? (
-          <Photos onBack={() => setHome("calendar")} />
+          <Photos onBack={() => setHome("calendar")} photos={photos} />
         ) : (
           <Calendar
             onPick={openDay}
@@ -851,10 +853,10 @@ function AppInner() {
   );
 }
 
-export default function RoutineApp() {
+export default function RoutineApp({ photos = [] }: { photos?: string[] }) {
   return (
     <RtnStoreProvider>
-      <AppInner />
+      <AppInner photos={photos} />
     </RtnStoreProvider>
   );
 }
