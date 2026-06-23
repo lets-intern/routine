@@ -26,6 +26,18 @@ alter table public.rtn_days add column if not exists texts        jsonb not null
 alter table public.rtn_days add column if not exists todos        jsonb not null default '[]'::jsonb;
 alter table public.rtn_days add column if not exists qa           jsonb not null default '[]'::jsonb;
 
+-- 사용자가 직접 추가한 루틴 항목 (대시보드의 '루틴 추가' 버튼)
+create table if not exists public.rtn_items (
+  id uuid primary key default gen_random_uuid(),
+  label   text not null default '',
+  section text not null default 'morning',   -- morning/day/supplement/evening/night
+  sort    int  not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.rtn_items enable row level security;
+drop policy if exists "anon all rtn_items" on public.rtn_items;
+create policy "anon all rtn_items" on public.rtn_items for all using (true) with check (true);
+
 -- RLS: 익명(anon) 키로 전체 접근 허용 (한 사람용 개인 도구).
 alter table public.rtn_days enable row level security;
 drop policy if exists "anon all rtn_days" on public.rtn_days;

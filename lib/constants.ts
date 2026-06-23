@@ -128,6 +128,15 @@ export const ALL_CHECK_KEYS = STEPS.flatMap((s) =>
   s.kind === "checks" ? s.items.filter((i) => i.kind === "check").map((i) => i.key) : []
 );
 
+// '루틴 추가' 에서 고를 수 있는 시간대 (checks 스텝 id 와 1:1)
+export const CHECK_SECTIONS: { id: string; emoji: string; label: string }[] = [
+  { id: "morning", emoji: "🌅", label: "아침" },
+  { id: "day", emoji: "☀️", label: "낮" },
+  { id: "supplement", emoji: "💊", label: "영양제" },
+  { id: "evening", emoji: "🌆", label: "저녁" },
+  { id: "night", emoji: "🌙", label: "밤" },
+];
+
 export type Choice = { key: string; emoji: string; label: string };
 
 // 기분 선택

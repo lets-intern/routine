@@ -5,6 +5,7 @@ import { RtnStoreProvider, useRtn } from "./store";
 import {
   ALL_CHECK_KEYS,
   BODYS,
+  CHECK_SECTIONS,
   MOODS,
   QUESTIONS,
   STEPS,
@@ -22,10 +23,10 @@ function fmtKDate(date: string): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
 }
 
-function dayPct(rec: RtnDay | undefined): number {
-  if (!rec) return 0;
-  const done = ALL_CHECK_KEYS.filter((k) => rec.checks[k]).length;
-  return Math.round((done / ALL_CHECK_KEYS.length) * 100);
+function dayPct(rec: RtnDay | undefined, keys: string[] = ALL_CHECK_KEYS): number {
+  if (!rec || keys.length === 0) return 0;
+  const done = keys.filter((k) => rec.checks[k]).length;
+  return Math.round((done / keys.length) * 100);
 }
 
 // 체크 key → 라벨 (모아보기에서 사용)
@@ -207,7 +208,7 @@ function TodoBlock({ date }: { date: string }) {
 }
 
 function StepBody({ step, date }: { step: Step; date: string }) {
-  const { getDay, setTime, setField } = useRtn();
+  const { getDay, setTime, setField, customItems } = useRtn();
   const day = getDay(date);
 
   switch (step.kind) {
@@ -237,14 +238,19 @@ function StepBody({ step, date }: { step: Step; date: string }) {
           onChange={(e) => setField(date, step.field, e.target.value)}
         />
       );
-    case "checks":
+    case "checks": {
+      // 내장 항목 + 이 시간대에 사용자가 추가한 항목
+      const extra: RtnItem[] = customItems
+        .filter((c) => c.section === step.id)
+        .map((c) => ({ key: c.id, label: c.label, kind: "check" }));
       return (
         <div className="rtn-items">
-          {step.items.map((it) => (
+          {[...step.items, ...extra].map((it) => (
             <ItemRow key={it.key} it={it} date={date} />
           ))}
         </div>
       );
+    }
   }
 }
 
@@ -460,15 +466,23 @@ function Calendar({
   onPick,
   onArchive,
   onPhotos,
+  onManage,
 }: {
   onPick: (date: string) => void;
   onArchive: () => void;
   onPhotos: () => void;
+  onManage: () => void;
 }) {
-  const { days } = useRtn();
+  const { days, customItems } = useRtn();
   const today = new Date(ymd(new Date()) + "T00:00");
   const todayStr = ymd(today);
   const [cur, setCur] = useState({ y: today.getFullYear(), m: today.getMonth() });
+
+  // 진행률 계산 대상 = 내장 체크 항목 + 사용자가 추가한 항목
+  const checkKeys = useMemo(
+    () => [...ALL_CHECK_KEYS, ...customItems.map((c) => c.id)],
+    [customItems]
+  );
 
   const cells = useMemo(() => {
     const first = new Date(cur.y, cur.m, 1);
@@ -483,12 +497,12 @@ function Calendar({
 
   // 이번 달 기록한 날 수 + 오늘 기준 연속 기록
   const recordedThisMonth = cells.filter(
-    (c) => c && days[c] && dayPct(days[c]) > 0
+    (c) => c && days[c] && dayPct(days[c], checkKeys) > 0
   ).length;
   let streak = 0;
   for (let k = 0; ; k++) {
     const d = ymd(addDays(today, -k));
-    if (days[d] && dayPct(days[d]) > 0) streak++;
+    if (days[d] && dayPct(days[d], checkKeys) > 0) streak++;
     else break;
   }
 
@@ -519,6 +533,7 @@ function Calendar({
       <div className="rtn-nav-row">
         <button onClick={onArchive}>📖 기록 모아보기</button>
         <button onClick={onPhotos}>📷 다예 사진보기</button>
+        <button onClick={onManage}>➕ 루틴 추가</button>
       </div>
 
       <div className="rtn-cal-head">
@@ -548,7 +563,7 @@ function Calendar({
         {cells.map((c, idx) => {
           if (!c) return <span key={idx} className="rtn-cal-cell empty" />;
           const rec = days[c];
-          const pct = dayPct(rec);
+          const pct = dayPct(rec, checkKeys);
           const future = c > todayStr;
           const isToday = c === todayStr;
           const dnum = Number(c.slice(8, 10));
@@ -867,13 +882,102 @@ function Archive({
   );
 }
 
+/* ───────────────────────── 루틴 추가/관리 ───────────────────────── */
+
+function Manage({ onBack }: { onBack: () => void }) {
+  const { customItems, addItem, removeItem } = useRtn();
+  const [label, setLabel] = useState("");
+  const [section, setSection] = useState(CHECK_SECTIONS[0].id);
+
+  const submit = () => {
+    if (!label.trim()) return;
+    addItem(label, section);
+    setLabel("");
+  };
+
+  return (
+    <div className="rtn-manage">
+      <div className="rtn-flow-bar">
+        <button className="rtn-iconbtn" onClick={onBack} aria-label="달력으로">
+          ‹
+        </button>
+        <b>루틴 추가</b>
+        <span style={{ width: 40 }} />
+      </div>
+
+      <section className="rtn-card">
+        <label className="rtn-mng-field">
+          <span className="rtn-mng-label">루틴 항목</span>
+          <input
+            className="rtn-mng-input"
+            value={label}
+            placeholder="예: 물 2L 마시기"
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+        </label>
+
+        <div className="rtn-mng-field">
+          <span className="rtn-mng-label">언제 할까요?</span>
+          <div className="rtn-mng-sections">
+            {CHECK_SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                className={`rtn-mng-sec${section === s.id ? " on" : ""}`}
+                onClick={() => setSection(s.id)}
+              >
+                {s.emoji} {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="rtn-mng-add" onClick={submit}>
+          루틴에 추가하기
+        </button>
+      </section>
+
+      <h3 className="rtn-mng-listtitle">내가 추가한 루틴</h3>
+      {customItems.length === 0 ? (
+        <p className="rtn-arc-empty">아직 직접 추가한 루틴이 없어요.</p>
+      ) : (
+        CHECK_SECTIONS.map((sec) => {
+          const items = customItems.filter((c) => c.section === sec.id);
+          if (items.length === 0) return null;
+          return (
+            <section key={sec.id} className="rtn-card rtn-mng-group">
+              <div className="rtn-mng-group-title">
+                {sec.emoji} {sec.label}
+              </div>
+              {items.map((it) => (
+                <div key={it.id} className="rtn-mng-item">
+                  <span>{it.label}</span>
+                  <button
+                    className="rtn-mng-del"
+                    onClick={() => removeItem(it.id)}
+                    aria-label="삭제"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </section>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────────── 앱 셸 ───────────────────────── */
 
 function AppInner({ photos }: { photos: string[] }) {
   const { loading, error, toastMsg } = useRtn();
   const [date, setDate] = useState<string | null>(null);
   const [mode, setMode] = useState<"flow" | "overview">("flow");
-  const [home, setHome] = useState<"calendar" | "archive" | "photos">("calendar");
+  const [home, setHome] = useState<
+    "calendar" | "archive" | "photos" | "manage"
+  >("calendar");
 
   const openDay = (d: string) => {
     setMode("flow");
@@ -922,11 +1026,14 @@ function AppInner({ photos }: { photos: string[] }) {
           <Archive onBack={() => setHome("calendar")} onPick={openDay} />
         ) : home === "photos" ? (
           <Photos onBack={() => setHome("calendar")} photos={photos} />
+        ) : home === "manage" ? (
+          <Manage onBack={() => setHome("calendar")} />
         ) : (
           <Calendar
             onPick={openDay}
             onArchive={() => setHome("archive")}
             onPhotos={() => setHome("photos")}
+            onManage={() => setHome("manage")}
           />
         )}
       </main>

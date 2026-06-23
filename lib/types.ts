@@ -5,6 +5,13 @@ export type Todo = { id: string; text: string; done: boolean };
 // 오늘의 질문에 대한 답변
 export type QA = { id: string; q: string; a: string };
 
+// 사용자가 직접 추가한 루틴 항목 (rtn_items 테이블)
+export type CustomItem = {
+  id: string; // 체크 key 로도 사용
+  label: string;
+  section: string; // morning/day/supplement/evening/night
+};
+
 export type RtnDay = {
   date: string; // YYYY-MM-DD (PK)
   checks: Record<string, boolean>;

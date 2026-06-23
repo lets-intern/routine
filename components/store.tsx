@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/utils/supabase/client";
-import type { RtnDay, RtnTextField, Todo } from "@/lib/types";
+import type { CustomItem, RtnDay, RtnTextField, Todo } from "@/lib/types";
 import { emptyDay } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
@@ -19,6 +19,9 @@ type Store = {
   error: string | null;
   toastMsg: string;
   days: Record<string, RtnDay>; // date -> 기록
+  customItems: CustomItem[]; // 사용자가 추가한 루틴 항목
+  addItem: (label: string, section: string) => Promise<void>;
+  removeItem: (id: string) => void;
   getDay: (date: string) => RtnDay; // 없으면 빈 기록 반환
   toggleCheck: (date: string, key: string) => void;
   setTime: (date: string, key: string, value: string) => void;
@@ -45,6 +48,7 @@ export function useRtn() {
 export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const [days, setDays] = useState<Record<string, RtnDay>>({});
+  const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState("");
@@ -91,11 +95,53 @@ export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
       }
       setDays(map);
       setLoading(false);
+
+      // 사용자가 추가한 루틴 항목 (테이블이 아직 없으면 조용히 빈 목록)
+      const itemsRes = await supabase
+        .from("rtn_items")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (!alive) return;
+      if (!itemsRes.error && itemsRes.data) {
+        setCustomItems(
+          (itemsRes.data as CustomItem[]).map((r) => ({
+            id: r.id,
+            label: r.label,
+            section: r.section,
+          }))
+        );
+      }
     })();
     return () => {
       alive = false;
     };
   }, [supabase]);
+
+  const addItem = useCallback(
+    async (label: string, section: string) => {
+      const text = label.trim();
+      if (!text) return;
+      const row = { id: uid(), label: text, section };
+      setCustomItems((prev) => [...prev, row]);
+      if (!supabase) return;
+      const { error } = await supabase.from("rtn_items").insert(row);
+      if (error) showToast("추가 실패: " + error.message);
+      else showToast("루틴에 추가됐어요");
+    },
+    [supabase, showToast]
+  );
+  const removeItem = useCallback(
+    (id: string) => {
+      setCustomItems((prev) => prev.filter((x) => x.id !== id));
+      if (!supabase) return;
+      supabase
+        .from("rtn_items")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => error && showToast("삭제 실패: " + error.message));
+    },
+    [supabase, showToast]
+  );
 
   const getDay = useCallback(
     (date: string) => days[date] || emptyDay(date),
@@ -242,6 +288,9 @@ export function RtnStoreProvider({ children }: { children: React.ReactNode }) {
     error,
     toastMsg,
     days,
+    customItems,
+    addItem,
+    removeItem,
     getDay,
     toggleCheck,
     setTime,
